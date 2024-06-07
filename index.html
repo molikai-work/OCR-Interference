@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<!--
+ -- © 2024 molikai-work
+ -- https://github.com/molikai-work/OCR-Interference
+ -->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抗OCR文本图像生成器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        #container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        #controls {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            margin-top: 20px;
+            background-color: #5d8d5f;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #59815b;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border: 1px solid black;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="maxChars">反OCR源文本：</label>
+        <input type="text" id="inputText" placeholder="输入文本" value="鉴于对人类家庭所有成员的固有尊严及其平等的和不移的权利的承认，乃是世界自由、正义与和平的基础。任何人不得使为奴隶或奴役，人人生而自由，人人有权享有生命、自由和人身安全。">
+        <label for="maxChars">最大行字数:</label>
+        <input type="number" id="maxChars" value="20">
+
+        <label for="margin">边距:</label>
+        <input type="number" id="margin" value="10">
+
+        <label for="fontSize">字体大小:</label>
+        <input type="number" id="fontSize" value="35">
+
+        <label for="distortionLevel">失真级别:</label>
+        <input type="number" id="distortionLevel" value="2">
+
+        <label for="waveFrequency">波频:</label>
+        <input type="number" id="waveFrequency" value="4">
+
+        <label for="waveAmplitude">波幅:</label>
+        <input type="number" id="waveAmplitude" value="3">
+
+        <button id="generateButton">生成图像</button>
+    </div>
+
+    <canvas id="textCanvas"></canvas>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const generateButton = document.getElementById('generateButton');
+            generateButton.addEventListener('click', updateCanvas);
+
+            // 更新画布
+            updateCanvas();
+        });
+
+        // 获取文本画布和绘图上下文
+        const canvas = document.getElementById('textCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 更新画布
+        function updateCanvas() {
+            const text = document.getElementById('inputText').value;
+            const maxChars = parseInt(document.getElementById('maxChars').value);
+            const margin = parseInt(document.getElementById('margin').value);
+            const fontSize = parseInt(document.getElementById('fontSize').value);
+            const distortionLevel = parseInt(document.getElementById('distortionLevel').value);
+            const waveFrequency = parseInt(document.getElementById('waveFrequency').value);
+            const waveAmplitude = parseInt(document.getElementById('waveAmplitude').value);
+            drawDistortedText(text, maxChars, margin, fontSize, distortionLevel, waveFrequency, waveAmplitude);
+        }
+
+        // 绘制失真文本
+        function drawDistortedText(text, maxChars, margin, fontSize, distortionLevel, waveFrequency, waveAmplitude) {
+            // 初始化画布高度
+            let canvasHeight = margin * 2;
+            let totalLines = 0;
+
+            // 逐行绘制文本
+            while (true) {
+                const lines = Math.ceil(text.length / maxChars);
+                totalLines += lines;
+                const lineHeight = fontSize + 10;
+                const maxHeight = totalLines * lineHeight;
+                const height = maxHeight + margin * 2;
+
+                if (height > canvasHeight) {
+                    canvasHeight = height;
+                }
+
+                // 创建新的画布
+                canvas.width = maxChars * (fontSize / 2) + 2 * margin;
+                canvas.height = canvasHeight;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.font = `${fontSize}px Arial`;
+                ctx.fillStyle = 'black';
+
+                // 文本自动换行
+                let x = margin;
+                let y = margin + fontSize;
+                let line = '';
+
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    const testLine = line + char;
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+
+                    // 如果当前行文本宽度超出了画布宽度则换行
+                    if (testWidth > maxChars * (fontSize / 2) && i > 0) {
+                        if (y + lineHeight > canvas.height) {
+                            break;
+                        }
+                        ctx.fillText(line, x, y);
+                        y += lineHeight;
+                        line = char;
+                    } else {
+                        line = testLine;
+                    }
+                }
+
+                // 绘制最后一行文本
+                ctx.fillText(line, x, y);
+
+                // 检查文本是否未超出画布高度，是则退出循环
+                if (y + lineHeight <= canvas.height) {
+                    break;
+                }
+            }
+
+            // 获取绘制文本后的图像数据
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            // 创建扭曲文本的图像数据
+            const distortedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const distortedData = distortedImageData.data;
+
+            // 添加波形失真
+            for (let y = 0; y < canvas.height; y++) {
+                const yDistortion = Math.sin(y / waveFrequency) * waveAmplitude;
+                for (let x = 0; x < canvas.width; x++) {
+                    const xDistortion = Math.sin(x / waveFrequency) * waveAmplitude;
+                    const dx = Math.floor(xDistortion + distortionLevel * (Math.random() - 0.5));
+                    const dy = Math.floor(yDistortion + distortionLevel * (Math.random() - 0.5));
+                    const sx = x + dx;
+                    const sy = y + dy;
+                    const si = (sx + sy * canvas.width) * 4;
+                    const di = (x + y * canvas.width) * 4;
+
+                    if (sx >= 0 && sx < canvas.width && sy >= 0 && sy < canvas.height) {
+                        distortedData[di] = data[si];
+                        distortedData[di + 1] = data[si + 1];
+                        distortedData[di + 2] = data[si + 2];
+                        distortedData[di + 3] = data[si + 3];
+                    }
+                }
+            }
+
+            // 绘制扭曲后的文本
+            ctx.putImageData(distortedImageData, 0, 0);
+        }
+    </script>
+</body>
+</html>
