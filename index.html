@@ -1,8 +1,4 @@
 <!DOCTYPE html>
-<!--
- -- © 2024 molikai-work
- -- https://github.com/molikai-work/OCR-Interference
- -->
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -66,25 +62,32 @@
 </head>
 <body>
     <div id="controls">
-        <label for="maxChars">反OCR源文本：</label>
+        <label for="inputText">反OCR源文本：</label>
         <input type="text" id="inputText" placeholder="输入文本" value="鉴于对人类家庭所有成员的固有尊严及其平等的和不移的权利的承认，乃是世界自由、正义与和平的基础。任何人不得使为奴隶或奴役，人人生而自由，人人有权享有生命、自由和人身安全。">
-        <label for="maxChars">最大行字数:</label>
-        <input type="number" id="maxChars" value="20">
+        
+        <label for="maxChars">最大行字数：</label>
+        <input type="number" id="maxChars" value="26">
 
-        <label for="margin">边距:</label>
+        <label for="margin">边距：</label>
         <input type="number" id="margin" value="10">
 
-        <label for="fontSize">字体大小:</label>
+        <label for="fontSize">字体大小：</label>
         <input type="number" id="fontSize" value="35">
 
-        <label for="distortionLevel">失真级别:</label>
+        <label for="distortionLevel">失真级别：</label>
         <input type="number" id="distortionLevel" value="2">
 
-        <label for="waveFrequency">波频:</label>
+        <label for="waveFrequency">波频：</label>
         <input type="number" id="waveFrequency" value="4">
 
-        <label for="waveAmplitude">波幅:</label>
+        <label for="waveAmplitude">波幅：</label>
         <input type="number" id="waveAmplitude" value="3">
+
+        <label for="pointCount">随机点数量：</label>
+        <input type="number" id="pointCount" value="100">
+
+        <label for="lineCount">随机线数量：</label>
+        <input type="number" id="lineCount" value="20">
 
         <button id="generateButton">生成图像</button>
     </div>
@@ -95,16 +98,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             const generateButton = document.getElementById('generateButton');
             generateButton.addEventListener('click', updateCanvas);
-
-            // 更新画布
-            updateCanvas();
+            updateCanvas(); // 初次加载页面时生成图像
         });
 
-        // 获取文本画布和绘图上下文
         const canvas = document.getElementById('textCanvas');
         const ctx = canvas.getContext('2d');
 
-        // 更新画布
         function updateCanvas() {
             const text = document.getElementById('inputText').value;
             const maxChars = parseInt(document.getElementById('maxChars').value);
@@ -113,89 +112,69 @@
             const distortionLevel = parseInt(document.getElementById('distortionLevel').value);
             const waveFrequency = parseInt(document.getElementById('waveFrequency').value);
             const waveAmplitude = parseInt(document.getElementById('waveAmplitude').value);
-            drawDistortedText(text, maxChars, margin, fontSize, distortionLevel, waveFrequency, waveAmplitude);
+            const pointCount = parseInt(document.getElementById('pointCount').value);
+            const lineCount = parseInt(document.getElementById('lineCount').value);
+
+            drawDistortedText(text, maxChars, margin, fontSize, distortionLevel, waveFrequency, waveAmplitude, pointCount, lineCount);
         }
 
-        // 绘制失真文本
-        function drawDistortedText(text, maxChars, margin, fontSize, distortionLevel, waveFrequency, waveAmplitude) {
-            // 初始化画布高度
-            let canvasHeight = margin * 2;
-            let totalLines = 0;
+        function drawDistortedText(text, maxChars, margin, fontSize, distortionLevel, waveFrequency, waveAmplitude, pointCount, lineCount) {
+            const lines = wrapText(ctx, text, maxChars, fontSize);
+            const lineHeight = fontSize + 10;
+            canvas.width = maxChars * (fontSize / 2) + 2 * margin;
+            canvas.height = lines.length * lineHeight + 2 * margin;
 
-            // 逐行绘制文本
-            while (true) {
-                const lines = Math.ceil(text.length / maxChars);
-                totalLines += lines;
-                const lineHeight = fontSize + 10;
-                const maxHeight = totalLines * lineHeight;
-                const height = maxHeight + margin * 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = `${fontSize}px Arial`;
+            ctx.fillStyle = 'black';
 
-                if (height > canvasHeight) {
-                    canvasHeight = height;
-                }
-
-                // 创建新的画布
-                canvas.width = maxChars * (fontSize / 2) + 2 * margin;
-                canvas.height = canvasHeight;
-
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.font = `${fontSize}px Arial`;
-                ctx.fillStyle = 'black';
-
-                // 文本自动换行
-                let x = margin;
-                let y = margin + fontSize;
-                let line = '';
-
-                for (let i = 0; i < text.length; i++) {
-                    const char = text[i];
-                    const testLine = line + char;
-                    const metrics = ctx.measureText(testLine);
-                    const testWidth = metrics.width;
-
-                    // 如果当前行文本宽度超出了画布宽度则换行
-                    if (testWidth > maxChars * (fontSize / 2) && i > 0) {
-                        if (y + lineHeight > canvas.height) {
-                            break;
-                        }
-                        ctx.fillText(line, x, y);
-                        y += lineHeight;
-                        line = char;
-                    } else {
-                        line = testLine;
-                    }
-                }
-
-                // 绘制最后一行文本
-                ctx.fillText(line, x, y);
-
-                // 检查文本是否未超出画布高度，是则退出循环
-                if (y + lineHeight <= canvas.height) {
-                    break;
-                }
+            let y = margin + fontSize;
+            for (const line of lines) {
+                ctx.fillText(line, margin, y);
+                y += lineHeight;
             }
 
-            // 获取绘制文本后的图像数据
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            distortCanvas(ctx, canvas.width, canvas.height, distortionLevel, waveFrequency, waveAmplitude);
+            addRandomPoints(ctx, canvas.width, canvas.height, pointCount);
+            addRandomLines(ctx, canvas.width, canvas.height, lineCount);
+        }
+
+        function wrapText(ctx, text, maxChars, fontSize) {
+            const words = text.split('');
+            const lines = [];
+            let line = '';
+            for (const word of words) {
+                const testLine = line + word;
+                const metrics = ctx.measureText(testLine);
+                const testWidth = metrics.width;
+                if (testWidth > maxChars * (fontSize / 2) && line.length > 0) {
+                    lines.push(line);
+                    line = word;
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+            return lines;
+        }
+
+        function distortCanvas(ctx, width, height, distortionLevel, waveFrequency, waveAmplitude) {
+            const imageData = ctx.getImageData(0, 0, width, height);
             const data = imageData.data;
+            const distortedData = new Uint8ClampedArray(data);
 
-            // 创建扭曲文本的图像数据
-            const distortedImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const distortedData = distortedImageData.data;
-
-            // 添加波形失真
-            for (let y = 0; y < canvas.height; y++) {
+            for (let y = 0; y < height; y++) {
                 const yDistortion = Math.sin(y / waveFrequency) * waveAmplitude;
-                for (let x = 0; x < canvas.width; x++) {
+                for (let x = 0; x < width; x++) {
                     const xDistortion = Math.sin(x / waveFrequency) * waveAmplitude;
                     const dx = Math.floor(xDistortion + distortionLevel * (Math.random() - 0.5));
                     const dy = Math.floor(yDistortion + distortionLevel * (Math.random() - 0.5));
                     const sx = x + dx;
                     const sy = y + dy;
-                    const si = (sx + sy * canvas.width) * 4;
-                    const di = (x + y * canvas.width) * 4;
+                    const si = (sx + sy * width) * 4;
+                    const di = (x + y * width) * 4;
 
-                    if (sx >= 0 && sx < canvas.width && sy >= 0 && sy < canvas.height) {
+                    if (sx >= 0 && sx < width && sy >= 0 && sy < height) {
                         distortedData[di] = data[si];
                         distortedData[di + 1] = data[si + 1];
                         distortedData[di + 2] = data[si + 2];
@@ -204,8 +183,28 @@
                 }
             }
 
-            // 绘制扭曲后的文本
-            ctx.putImageData(distortedImageData, 0, 0);
+            ctx.putImageData(new ImageData(distortedData, width, height), 0, 0);
+        }
+
+        function addRandomPoints(ctx, width, height, count) {
+            for (let i = 0; i < count; i++) {
+                const x = Math.random() * width;
+                const y = Math.random() * height;
+                ctx.fillRect(x, y, 2, 2); // 绘制一个2x2的点
+            }
+        }
+
+        function addRandomLines(ctx, width, height, count) {
+            for (let i = 0; i < count; i++) {
+                const x1 = Math.random() * width;
+                const y1 = Math.random() * height;
+                const x2 = Math.random() * width;
+                const y2 = Math.random() * height;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
         }
     </script>
 </body>
